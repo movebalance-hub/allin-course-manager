@@ -141,6 +141,8 @@
 <div id="toast" class="toast"></div>
 
 <script>
+const DEFAULT_SUPABASE_URL='https://uhtdnyjagzkszieujyco.supabase.co';
+const DEFAULT_SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVodGRueWphZ3prc3ppZXVqeWNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MDQ0ODIsImV4cCI6MjA5ODk4MDQ4Mn0.und9CKsVJYcYtSgvQ9N1aLWpQ46Y7C75BfCluKVXGSo';
 let sb=null, currentMonth=defaultMonth(), activeTab='course', editingId=null;
 let cache={course:[],payment:[],venue:[],expenses:null};
 
@@ -194,8 +196,7 @@ async function handleSaveConfig(){
 }
 
 async function boot(){
-  const cfg=await loadConfig();
-  if(!cfg){ showSetupScreen(); return; }
+  const cfg=(await loadConfig()) || {url:DEFAULT_SUPABASE_URL, key:DEFAULT_SUPABASE_KEY};
   sb=supabase.createClient(cfg.url,cfg.key);
   document.getElementById('setupScreen').style.display='none';
   document.getElementById('app').style.display='block';
