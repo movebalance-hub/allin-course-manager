@@ -308,7 +308,7 @@ async function renderCourseTab(){
       <h3>新增課堂紀錄</h3>
       <div class="form-grid">
         <div><label>日期</label><input type="date" id="c_date"></div>
-        <div><label>時間</label><input type="time" id="c_time"></div>
+        <div><label>時間</label><input type="time" id="c_time" step="900"></div>
         <div><label>課程類型</label>
           <select id="c_class_type" onchange="onAddClassTypeChange()">
             <option value="一對一">一對一</option>
@@ -352,7 +352,7 @@ function renderCourseTable(){
       body+=`<tr>
         <td class="num">${i+1}</td>
         <td><input type="date" id="e_date" value="${r.session_date||''}"></td>
-        <td><input type="time" id="e_time" value="${r.session_time||''}"></td>
+        <td><input type="time" id="e_time" step="900" value="${r.session_time||''}"></td>
         <td>
           <select id="e_class_type" onchange="onEditClassTypeChange()">
             <option value="一對一" ${!isGroup?'selected':''}>一對一</option>
