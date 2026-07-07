@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>歐印銷課管理系統</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root{
+    --bg:#F6F4EF;
+    --surface:#FFFFFF;
+    --ink:#28241F;
+    --ink-soft:#8A8377;
+    --line:#E6E0D4;
+    --teal:#1F6F6B;
+    --teal-soft:#E3EFEC;
+    --amber:#C77B36;
+    --amber-soft:#FAEEDD;
+    --danger:#B3452F;
+    --danger-soft:#F6E4DE;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Noto Sans TC',sans-serif;
+    font-size:14px;
+    line-height:1.5;
+  }
+  h1,h2,h3{font-family:'Noto Serif TC',serif;margin:0;}
+  .app{max-width:1080px;margin:0 auto;padding:28px 20px 60px;}
+  .header{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;}
+  .header h1{font-size:22px;color:var(--ink);}
+  .header .sub{color:var(--ink-soft);font-size:12.5px;margin-top:4px;}
+  .month-picker{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:8px 12px;}
+  .month-picker label{font-size:12px;color:var(--ink-soft);}
+  .month-picker input{border:none;font-family:inherit;font-size:14px;color:var(--ink);background:transparent;}
+  .month-picker input:focus{outline:none;}
+
+  .setup-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:24px;max-width:520px;margin:60px auto;}
+  .setup-card h2{font-size:18px;margin-bottom:6px;}
+  .setup-card p{color:var(--ink-soft);font-size:13px;margin:0 0 16px;}
+  .setup-card input{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:13px;margin-bottom:10px;}
+  .setup-card button{width:100%;}
+  .setup-note{background:var(--teal-soft);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--teal);margin-top:14px;}
+
+  .tabs{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:18px;flex-wrap:wrap;}
+  .tab-btn{background:none;border:none;padding:10px 16px;font-family:'Noto Sans TC',sans-serif;font-size:14px;font-weight:500;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .tab-btn.active{color:var(--teal);border-bottom-color:var(--teal);}
+
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:16px;}
+  .panel h3{font-size:15px;margin-bottom:12px;}
+
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:10px;}
+  .form-grid label{display:block;font-size:11px;color:var(--ink-soft);margin-bottom:3px;}
+  .form-grid input,.form-grid select{width:100%;padding:8px 9px;border:1px solid var(--line);border-radius:7px;font-family:inherit;font-size:13px;background:#fff;}
+  .form-actions{display:flex;justify-content:flex-end;}
+
+  button{cursor:pointer;font-family:inherit;font-size:13px;font-weight:500;border-radius:7px;border:1px solid transparent;padding:8px 16px;}
+  .btn-primary{background:var(--teal);color:#fff;}
+  .btn-primary:hover{background:#175753;}
+  .btn-ghost{background:transparent;border-color:var(--line);color:var(--ink);}
+  .btn-ghost:hover{background:var(--bg);}
+  .btn-danger{background:var(--danger-soft);color:var(--danger);border-color:transparent;}
+  .btn-danger:hover{background:var(--danger);color:#fff;}
+  .btn-sm{padding:5px 10px;font-size:12px;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;color:var(--ink-soft);font-weight:500;font-size:11.5px;padding:8px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
+  td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  td input,td select{width:100%;padding:5px 6px;border:1px solid var(--line);border-radius:6px;font-family:inherit;font-size:12.5px;}
+  .tag{display:inline-block;padding:2px 8px;border-radius:100px;font-size:11.5px;font-weight:500;}
+  .tag-y{background:var(--teal-soft);color:var(--teal);}
+  .tag-o{background:var(--amber-soft);color:var(--amber);}
+  .row-actions{display:flex;gap:6px;white-space:nowrap;}
+  .empty-row td{color:var(--ink-soft);text-align:center;padding:22px;font-size:12.5px;}
+  .num{text-align:right;font-variant-numeric:tabular-nums;}
+
+  .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;}
+  .stat{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:14px 16px;}
+  .stat .label{font-size:11.5px;color:var(--ink-soft);margin-bottom:6px;}
+  .stat .value{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .stat.teal{border-color:#cfe4e1;}
+  .stat.teal .value{color:var(--teal);}
+  .stat.amber{border-color:#f0d9b8;}
+  .stat.amber .value{color:var(--amber);}
+
+  .expense-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;}
+  .expense-row div label{display:block;font-size:11.5px;color:var(--ink-soft);margin-bottom:4px;}
+  .expense-row input{width:100%;padding:8px 9px;border:1px solid var(--line);border-radius:7px;font-family:inherit;font-size:13px;}
+
+  .ratio-bar{display:flex;height:14px;border-radius:100px;overflow:hidden;margin:6px 0 8px;}
+  .ratio-bar span{height:100%;}
+  .ratio-legend{display:flex;gap:16px;font-size:12px;color:var(--ink-soft);flex-wrap:wrap;}
+  .ratio-legend .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;}
+
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:100px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:50;}
+  .toast.show{opacity:1;}
+  .settings-link{font-size:11.5px;color:var(--ink-soft);cursor:pointer;text-decoration:underline;background:none;border:none;padding:0;}
+  .loading{color:var(--ink-soft);font-size:12.5px;padding:20px;text-align:center;}
+</style>
+</head>
+<body>
+
+<div id="setupScreen" class="setup-card" style="display:none;">
+  <h2>連結 Supabase</h2>
+  <p>請貼上你的 Supabase 專案 URL 與 anon public key(在 Supabase 後台 → Project Settings → API 取得)。連線資訊只會存在這個瀏覽器裡。</p>
+  <input id="inputUrl" placeholder="https://xxxxxxxx.supabase.co">
+  <input id="inputKey" placeholder="anon public key">
+  <button class="btn-primary" onclick="handleSaveConfig()">連線並開始使用</button>
+  <div class="setup-note">尚未建立資料表嗎?請先在 Supabase 的 SQL Editor 執行我提供的 supabase_schema.sql,再回來這裡連線。</div>
+</div>
+
+<div id="app" class="app" style="display:none;">
+  <div class="header">
+    <div>
+      <h1>歐印銷課管理系統</h1>
+      <div class="sub">課堂紀錄・付款紀錄・場地租借・整月加總 &nbsp;·&nbsp; <button class="settings-link" onclick="showSetupScreen()">重新設定連線</button></div>
+    </div>
+    <div class="month-picker">
+      <label>月份</label>
+      <input type="month" id="monthInput" onchange="onMonthChange()">
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn" data-tab="course" onclick="switchTab('course')">課堂紀錄</button>
+    <button class="tab-btn" data-tab="payment" onclick="switchTab('payment')">付款紀錄</button>
+    <button class="tab-btn" data-tab="venue" onclick="switchTab('venue')">場地租借</button>
+    <button class="tab-btn" data-tab="summary" onclick="switchTab('summary')">整月加總</button>
+  </div>
+
+  <div id="tabContent"></div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+let sb=null, currentMonth=defaultMonth(), activeTab='course', editingId=null;
+let cache={course:[],payment:[],venue:[],expenses:null};
+
+function defaultMonth(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),1800);
+}
+function fmt(n){ n=Number(n)||0; return n.toLocaleString('zh-Hant',{maximumFractionDigits:1}); }
+
+async function loadConfig(){
+  try{
+    const raw=localStorage.getItem('supabase_config');
+    return raw? JSON.parse(raw): null;
+  }catch(e){ return null; }
+}
+async function saveConfigStorage(url,key){
+  try{
+    localStorage.setItem('supabase_config', JSON.stringify({url,key}));
+  }catch(e){
+    console.warn('無法儲存連線設定,本次僅在本頁面有效', e);
+  }
+}
+
+function showSetupScreen(){
+  document.getElementById('app').style.display='none';
+  document.getElementById('setupScreen').style.display='block';
+}
+
+async function handleSaveConfig(){
+  const url=document.getElementById('inputUrl').value.trim().replace(/\/rest\/v1\/?$/,'').replace(/\/$/,'');
+  const key=document.getElementById('inputKey').value.trim();
+  if(!url||!key){ showToast('請輸入完整的 URL 與 key'); return; }
+  try{
+    sb=supabase.createClient(url,key);
+    const {error}=await sb.from('monthly_expenses').select('month').limit(1);
+    if(error) throw error;
+    await saveConfigStorage(url,key);
+    document.getElementById('setupScreen').style.display='none';
+    document.getElementById('app').style.display='block';
+    document.getElementById('monthInput').value=currentMonth;
+    switchTab('course');
+  }catch(e){
+    console.error(e);
+    showToast('連線失敗:'+(e && e.message ? e.message : '請確認 URL / key / 資料表是否已建立'));
+  }
+}
+
+async function boot(){
+  const cfg=await loadConfig();
+  if(!cfg){ showSetupScreen(); return; }
+  sb=supabase.createClient(cfg.url,cfg.key);
+  document.getElementById('setupScreen').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('monthInput').value=currentMonth;
+  switchTab('course');
+}
+
+function onMonthChange(){
+  currentMonth=document.getElementById('monthInput').value || defaultMonth();
+  switchTab(activeTab);
+}
+
+function switchTab(tab){
+  activeTab=tab; editingId=null;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  const map={course:renderCourseTab, payment:renderPaymentTab, venue:renderVenueTab, summary:renderSummaryTab};
+  map[tab]();
+}
+
+/* ---------------- 課堂紀錄 ---------------- */
+let addNameCount=1, editNameCount=1;
+function ratioToCount(ratio){
+  const map={'一對一':1,'一對二':2,'一對三':3,'一對四':4,'一對五':5,'一對六':6};
+  return map[ratio]||1;
+}
+function ratioOptionsHTML(selected){
+  return ['一對一','一對二','一對三','一對四','一對五','一對六']
+    .map(r=>`<option value="${r}" ${r===selected?'selected':''}>${r}</option>`).join('');
+}
+function collectNames(prefix,count){
+  const arr=[];
+  for(let i=0;i<count;i++){
+    const el=document.getElementById(`${prefix}_name_${i}`);
+    arr.push(el? el.value : '');
+  }
+  return arr;
+}
+function renderNamesArea(containerId,prefix,count,values){
+  const container=document.getElementById(containerId);
+  if(!container) return;
+  let html='';
+  for(let i=0;i<count;i++){
+    html+=`<input type="text" id="${prefix}_name_${i}" placeholder="學員姓名 ${i+1}" value="${(values[i]||'').replace(/"/g,'&quot;')}" style="margin-bottom:6px;">`;
+  }
+  container.innerHTML=html;
+}
+function onAddClassTypeChange(){
+  const t=document.getElementById('c_class_type').value;
+  const ratioWrap=document.getElementById('c_ratio_wrap');
+  const singleWrap=document.getElementById('c_name_single_wrap');
+  const multiWrap=document.getElementById('c_name_multi_wrap');
+  if(t==='團課'){
+    ratioWrap.style.display='block'; singleWrap.style.display='none'; multiWrap.style.display='block';
+    addNameCount=ratioToCount(document.getElementById('c_ratio').value);
+    renderNamesArea('c_names_container','c',addNameCount,[]);
+  } else {
+    ratioWrap.style.display='none'; singleWrap.style.display='block'; multiWrap.style.display='none';
+  }
+}
+function onAddRatioChange(){
+  const ratio=document.getElementById('c_ratio').value;
+  const values=collectNames('c',addNameCount);
+  addNameCount=ratioToCount(ratio);
+  renderNamesArea('c_names_container','c',addNameCount,values);
+}
+function addAddPanelNameField(){
+  const values=collectNames('c',addNameCount);
+  addNameCount+=1;
+  renderNamesArea('c_names_container','c',addNameCount,values);
+}
+function onEditClassTypeChange(){
+  const t=document.getElementById('e_class_type').value;
+  const ratioSel=document.getElementById('e_ratio');
+  const singleWrap=document.getElementById('e_name_single_wrap');
+  const multiWrap=document.getElementById('e_name_multi_wrap');
+  if(t==='團課'){
+    ratioSel.style.display='inline-block'; singleWrap.style.display='none'; multiWrap.style.display='block';
+    editNameCount=ratioToCount(ratioSel.value);
+    renderNamesArea('e_names_container','e',editNameCount,[]);
+  } else {
+    ratioSel.style.display='none'; singleWrap.style.display='block'; multiWrap.style.display='none';
+  }
+}
+function onEditRatioChange(){
+  const ratio=document.getElementById('e_ratio').value;
+  const values=collectNames('e',editNameCount);
+  editNameCount=ratioToCount(ratio);
+  renderNamesArea('e_names_container','e',editNameCount,values);
+}
+function addEditPanelNameField(){
+  const values=collectNames('e',editNameCount);
+  editNameCount+=1;
+  renderNamesArea('e_names_container','e',editNameCount,values);
+}
+function editCourseRow(id){
+  const r=cache.course.find(x=>x.id===id);
+  if(!r) return;
+  editingId=id;
+  editNameCount=(r.class_type==='團課')
+    ? ((r.student_names&&r.student_names.length)? r.student_names.length : ratioToCount(r.class_ratio||'一對一'))
+    : 1;
+  renderCourseTable();
+}
+async function renderCourseTab(){
+  const el=document.getElementById('tabContent');
+  addNameCount=1;
+  el.innerHTML=`
+    <div class="panel">
+      <h3>新增課堂紀錄</h3>
+      <div class="form-grid">
+        <div><label>日期</label><input type="date" id="c_date"></div>
+        <div><label>時間</label><input type="time" id="c_time"></div>
+        <div><label>課程類型</label>
+          <select id="c_class_type" onchange="onAddClassTypeChange()">
+            <option value="一對一">一對一</option>
+            <option value="團課">團課</option>
+          </select>
+        </div>
+        <div id="c_ratio_wrap" style="display:none;"><label>班級人數比</label>
+          <select id="c_ratio" onchange="onAddRatioChange()">${ratioOptionsHTML('一對一')}</select>
+        </div>
+        <div><label>平均單價</label><input type="number" id="c_price" placeholder="0"></div>
+        <div><label>剩餘堂數</label><input type="number" id="c_remain" placeholder="0" step="0.5"></div>
+        <div><label>課源來源</label>
+          <select id="c_source"><option value="永衡">永衡</option><option value="歐印">歐印</option></select>
+        </div>
+      </div>
+      <div id="c_name_single_wrap">
+        <label style="display:block;font-size:11px;color:var(--ink-soft);margin-bottom:3px;">客戶姓名</label>
+        <input type="text" id="c_name" placeholder="客戶姓名" style="width:100%;padding:8px 9px;border:1px solid var(--line);border-radius:7px;font-family:inherit;font-size:13px;">
+      </div>
+      <div id="c_name_multi_wrap" style="display:none;">
+        <label style="display:block;font-size:11px;color:var(--ink-soft);margin-bottom:3px;">學員姓名</label>
+        <div id="c_names_container" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+        <button class="btn-ghost btn-sm" type="button" onclick="addAddPanelNameField()">+ 新增學員</button>
+      </div>
+      <div class="form-actions" style="margin-top:12px;"><button class="btn-primary" onclick="addCourse()">新增</button></div>
+    </div>
+    <div class="panel"><div class="loading">載入中...</div></div>`;
+  const {data,error}=await sb.from('course_records').select('*').eq('month',currentMonth)
+      .order('session_date',{ascending:true}).order('session_time',{ascending:true});
+  if(error){ el.querySelector('.panel:last-child').innerHTML=`<div class="loading">讀取失敗:${error.message}</div>`; return; }
+  cache.course=data||[];
+  renderCourseTable();
+}
+function renderCourseTable(){
+  const rows=cache.course;
+  let body='';
+  if(rows.length===0){ body='<tr class="empty-row"><td colspan="9">本月尚無課堂紀錄</td></tr>'; }
+  rows.forEach((r,i)=>{
+    if(editingId===r.id){
+      const isGroup=r.class_type==='團課';
+      body+=`<tr>
+        <td class="num">${i+1}</td>
+        <td><input type="date" id="e_date" value="${r.session_date||''}"></td>
+        <td><input type="time" id="e_time" value="${r.session_time||''}"></td>
+        <td>
+          <select id="e_class_type" onchange="onEditClassTypeChange()">
+            <option value="一對一" ${!isGroup?'selected':''}>一對一</option>
+            <option value="團課" ${isGroup?'selected':''}>團課</option>
+          </select>
+          <select id="e_ratio" onchange="onEditRatioChange()" style="margin-top:4px;${isGroup?'':'display:none;'}">${ratioOptionsHTML(r.class_ratio||'一對一')}</select>
+        </td>
+        <td>
+          <div id="e_name_single_wrap" style="${isGroup?'display:none;':''}">
+            <input type="text" id="e_name" value="${isGroup?'':(r.client_name||'')}">
+          </div>
+          <div id="e_name_multi_wrap" style="${isGroup?'':'display:none;'}">
+            <div id="e_names_container" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px;"></div>
+            <button class="btn-ghost btn-sm" type="button" onclick="addEditPanelNameField()">+ 新增學員</button>
+          </div>
+        </td>
+        <td><input type="number" id="e_price" value="${r.avg_price||0}"></td>
+        <td><input type="number" id="e_remain" step="0.5" value="${r.remaining_sessions||0}"></td>
+        <td><select id="e_source"><option value="永衡" ${r.source==='永衡'?'selected':''}>永衡</option><option value="歐印" ${r.source==='歐印'?'selected':''}>歐印</option></select></td>
+        <td class="row-actions"><button class="btn-primary btn-sm" onclick="saveCourse('${r.id}')">儲存</button><button class="btn-ghost btn-sm" onclick="editingId=null;renderCourseTable();">取消</button></td>
+      </tr>`;
+    } else {
+      const isGroup=r.class_type==='團課';
+      const typeLabel=isGroup? ('團課・'+(r.class_ratio||'一對一')) : '一對一';
+      const nameLabel=isGroup
+        ? ((r.student_names&&r.student_names.length)? r.student_names.join('、') : (r.client_name||''))
+        : (r.client_name||'');
+      body+=`<tr>
+        <td class="num">${i+1}</td>
+        <td>${r.session_date||''}</td>
+        <td>${r.session_time? r.session_time.slice(0,5):''}</td>
+        <td>${typeLabel}</td>
+        <td>${nameLabel}</td>
+        <td class="num">${fmt(r.avg_price)}</td>
+        <td class="num">${fmt(r.remaining_sessions)}</td>
+        <td><span class="tag ${r.source==='永衡'?'tag-y':'tag-o'}">${r.source||''}</span></td>
+        <td class="row-actions"><button class="btn-ghost btn-sm" onclick="editCourseRow('${r.id}')">編輯</button><button class="btn-danger btn-sm" onclick="deleteRow('course_records','${r.id}','course')">刪除</button></td>
+      </tr>`;
+    }
+  });
+  document.querySelector('.panel:last-child').innerHTML=`
+    <h3>本月課堂紀錄(第幾堂課依日期自動排序)</h3>
+    <table><thead><tr><th>#</th><th>日期</th><th>時間</th><th>類型</th><th>客戶/學員姓名</th><th>平均單價</th><th>剩餘堂數</th><th>課源</th><th></th></tr></thead>
+    <tbody>${body}</tbody></table>`;
+  const editing=cache.course.find(r=>r.id===editingId);
+  if(editing && editing.class_type==='團課'){
+    renderNamesArea('e_names_container','e',editNameCount, editing.student_names||[]);
+  }
+}
+async function addCourse(){
+  const classType=document.getElementById('c_class_type').value;
+  const rec={
+    month:currentMonth,
+    session_date:document.getElementById('c_date').value||null,
+    session_time:document.getElementById('c_time').value||null,
+    avg_price:Number(document.getElementById('c_price').value)||0,
+    remaining_sessions:Number(document.getElementById('c_remain').value)||0,
+    source:document.getElementById('c_source').value,
+    class_type:classType
+  };
+  if(classType==='團課'){
+    const names=collectNames('c',addNameCount).map(n=>n.trim()).filter(n=>n);
+    rec.class_ratio=document.getElementById('c_ratio').value;
+    rec.student_names=names;
+    rec.client_name=names.join('、');
+  } else {
+    rec.class_ratio=null;
+    rec.student_names=[];
+    rec.client_name=document.getElementById('c_name').value;
+  }
+  const {error}=await sb.from('course_records').insert(rec);
+  if(error){ showToast('新增失敗:'+error.message); return; }
+  showToast('已新增'); renderCourseTab();
+}
+async function saveCourse(id){
+  const classType=document.getElementById('e_class_type').value;
+  const rec={
+    session_date:document.getElementById('e_date').value||null,
+    session_time:document.getElementById('e_time').value||null,
+    avg_price:Number(document.getElementById('e_price').value)||0,
+    remaining_sessions:Number(document.getElementById('e_remain').value)||0,
+    source:document.getElementById('e_source').value,
+    class_type:classType
+  };
+  if(classType==='團課'){
+    const names=collectNames('e',editNameCount).map(n=>n.trim()).filter(n=>n);
+    rec.class_ratio=document.getElementById('e_ratio').value;
+    rec.student_names=names;
+    rec.client_name=names.join('、');
+  } else {
+    rec.class_ratio=null;
+    rec.student_names=[];
+    rec.client_name=document.getElementById('e_name').value;
+  }
+  const {error}=await sb.from('course_records').update(rec).eq('id',id);
+  if(error){ showToast('儲存失敗:'+error.message); return; }
+  editingId=null; showToast('已儲存'); renderCourseTab();
+}
+
+/* ---------------- 付款紀錄 ---------------- */
+async function renderPaymentTab(){
+  const el=document.getElementById('tabContent');
+  el.innerHTML=`
+    <div class="panel">
+      <h3>新增付款紀錄</h3>
+      <div class="form-grid">
+        <div><label>付款會員</label><input type="text" id="p_name"></div>
+        <div><label>購買方案</label><input type="text" id="p_plan"></div>
+        <div><label>平均單價</label><input type="number" id="p_price"></div>
+        <div><label>購買堂數</label><input type="number" id="p_sessions"></div>
+        <div><label>結帳日期</label><input type="date" id="p_date"></div>
+        <div><label>備註</label><input type="text" id="p_note"></div>
+      </div>
+      <div class="form-actions"><button class="btn-primary" onclick="addPayment()">新增</button></div>
+    </div>
+    <div class="panel"><div class="loading">載入中...</div></div>`;
+  const {data,error}=await sb.from('payment_records').select('*').eq('month',currentMonth).order('payment_date',{ascending:true});
+  if(error){ el.querySelector('.panel:last-child').innerHTML=`<div class="loading">讀取失敗:${error.message}</div>`; return; }
+  cache.payment=data||[];
+  renderPaymentTable();
+}
+function renderPaymentTable(){
+  const rows=cache.payment;
+  let body='';
+  if(rows.length===0){ body='<tr class="empty-row"><td colspan="7">本月尚無付款紀錄</td></tr>'; }
+  rows.forEach(r=>{
+    if(editingId===r.id){
+      body+=`<tr>
+        <td><input type="text" id="e_name" value="${r.member_name||''}"></td>
+        <td><input type="text" id="e_plan" value="${r.plan||''}"></td>
+        <td><input type="number" id="e_price" value="${r.avg_price||0}"></td>
+        <td><input type="number" id="e_sessions" value="${r.sessions_purchased||0}"></td>
+        <td><input type="date" id="e_date" value="${r.payment_date||''}"></td>
+        <td><input type="text" id="e_note" value="${r.note||''}"></td>
+        <td class="row-actions"><button class="btn-primary btn-sm" onclick="savePayment('${r.id}')">儲存</button><button class="btn-ghost btn-sm" onclick="editingId=null;renderPaymentTable();">取消</button></td>
+      </tr>`;
+    }else{
+      body+=`<tr>
+        <td>${r.member_name||''}</td>
+        <td>${r.plan||''}</td>
+        <td class="num">${fmt(r.avg_price)}</td>
+        <td class="num">${fmt(r.sessions_purchased)}</td>
+        <td>${r.payment_date||''}</td>
+        <td>${r.note||''}</td>
+        <td class="row-actions"><button class="btn-ghost btn-sm" onclick="editingId='${r.id}';renderPaymentTable();">編輯</button><button class="btn-danger btn-sm" onclick="deleteRow('payment_records','${r.id}','payment')">刪除</button></td>
+      </tr>`;
+    }
+  });
+  document.querySelector('.panel:last-child').innerHTML=`
+    <h3>本月付款紀錄</h3>
+    <table><thead><tr><th>付款會員</th><th>購買方案</th><th>平均單價</th><th>購買堂數</th><th>結帳日期</th><th>備註</th><th></th></tr></thead>
+    <tbody>${body}</tbody></table>`;
+}
+async function addPayment(){
+  const rec={
+    month:currentMonth,
+    member_name:document.getElementById('p_name').value,
+    plan:document.getElementById('p_plan').value,
+    avg_price:Number(document.getElementById('p_price').value)||0,
+    sessions_purchased:Number(document.getElementById('p_sessions').value)||0,
+    payment_date:document.getElementById('p_date').value||null,
+    note:document.getElementById('p_note').value
+  };
+  const {error}=await sb.from('payment_records').insert(rec);
+  if(error){ showToast('新增失敗:'+error.message); return; }
+  showToast('已新增'); renderPaymentTab();
+}
+async function savePayment(id){
+  const rec={
+    member_name:document.getElementById('e_name').value,
+    plan:document.getElementById('e_plan').value,
+    avg_price:Number(document.getElementById('e_price').value)||0,
+    sessions_purchased:Number(document.getElementById('e_sessions').value)||0,
+    payment_date:document.getElementById('e_date').value||null,
+    note:document.getElementById('e_note').value
+  };
+  const {error}=await sb.from('payment_records').update(rec).eq('id',id);
+  if(error){ showToast('儲存失敗:'+error.message); return; }
+  editingId=null; showToast('已儲存'); renderPaymentTab();
+}
+
+/* ---------------- 場地租借 ---------------- */
+async function renderVenueTab(){
+  const el=document.getElementById('tabContent');
+  el.innerHTML=`
+    <div class="panel">
+      <h3>新增場地租借紀錄</h3>
+      <div class="form-grid">
+        <div><label>租借教練</label><input type="text" id="v_coach"></div>
+        <div><label>使用人數</label><input type="number" id="v_people"></div>
+        <div><label>使用時數</label><input type="number" id="v_hours" step="0.5"></div>
+        <div><label>金額</label><input type="number" id="v_amount"></div>
+        <div><label>結帳日期</label><input type="date" id="v_date"></div>
+      </div>
+      <div class="form-actions"><button class="btn-primary" onclick="addVenue()">新增</button></div>
+    </div>
+    <div class="panel"><div class="loading">載入中...</div></div>`;
+  const {data,error}=await sb.from('venue_rentals').select('*').eq('month',currentMonth).order('payment_date',{ascending:true});
+  if(error){ el.querySelector('.panel:last-child').innerHTML=`<div class="loading">讀取失敗:${error.message}</div>`; return; }
+  cache.venue=data||[];
+  renderVenueTable();
+}
+function renderVenueTable(){
+  const rows=cache.venue;
+  let body='';
+  if(rows.length===0){ body='<tr class="empty-row"><td colspan="6">本月尚無場地租借紀錄</td></tr>'; }
+  rows.forEach(r=>{
+    if(editingId===r.id){
+      body+=`<tr>
+        <td><input type="text" id="e_coach" value="${r.coach_name||''}"></td>
+        <td><input type="number" id="e_people" value="${r.num_people||0}"></td>
+        <td><input type="number" id="e_hours" step="0.5" value="${r.hours||0}"></td>
+        <td><input type="number" id="e_amount" value="${r.amount||0}"></td>
+        <td><input type="date" id="e_date" value="${r.payment_date||''}"></td>
+        <td class="row-actions"><button class="btn-primary btn-sm" onclick="saveVenue('${r.id}')">儲存</button><button class="btn-ghost btn-sm" onclick="editingId=null;renderVenueTable();">取消</button></td>
+      </tr>`;
+    }else{
+      body+=`<tr>
+        <td>${r.coach_name||''}</td>
+        <td class="num">${fmt(r.num_people)}</td>
+        <td class="num">${fmt(r.hours)}</td>
+        <td class="num">${fmt(r.amount)}</td>
+        <td>${r.payment_date||''}</td>
+        <td class="row-actions"><button class="btn-ghost btn-sm" onclick="editingId='${r.id}';renderVenueTable();">編輯</button><button class="btn-danger btn-sm" onclick="deleteRow('venue_rentals','${r.id}','venue')">刪除</button></td>
+      </tr>`;
+    }
+  });
+  document.querySelector('.panel:last-child').innerHTML=`
+    <h3>本月場地租借紀錄</h3>
+    <table><thead><tr><th>租借教練</th><th>使用人數</th><th>使用時數</th><th>金額</th><th>結帳日期</th><th></th></tr></thead>
+    <tbody>${body}</tbody></table>`;
+}
+async function addVenue(){
+  const rec={
+    month:currentMonth,
+    coach_name:document.getElementById('v_coach').value,
+    num_people:Number(document.getElementById('v_people').value)||0,
+    hours:Number(document.getElementById('v_hours').value)||0,
+    amount:Number(document.getElementById('v_amount').value)||0,
+    payment_date:document.getElementById('v_date').value||null
+  };
+  const {error}=await sb.from('venue_rentals').insert(rec);
+  if(error){ showToast('新增失敗:'+error.message); return; }
+  showToast('已新增'); renderVenueTab();
+}
+async function saveVenue(id){
+  const rec={
+    coach_name:document.getElementById('e_coach').value,
+    num_people:Number(document.getElementById('e_people').value)||0,
+    hours:Number(document.getElementById('e_hours').value)||0,
+    amount:Number(document.getElementById('e_amount').value)||0,
+    payment_date:document.getElementById('e_date').value||null
+  };
+  const {error}=await sb.from('venue_rentals').update(rec).eq('id',id);
+  if(error){ showToast('儲存失敗:'+error.message); return; }
+  editingId=null; showToast('已儲存'); renderVenueTab();
+}
+
+/* ---------------- 共用刪除 ---------------- */
+async function deleteRow(table,id,tab){
+  if(!confirm('確定要刪除這筆紀錄嗎?')) return;
+  const {error}=await sb.from(table).delete().eq('id',id);
+  if(error){ showToast('刪除失敗:'+error.message); return; }
+  showToast('已刪除');
+  if(tab==='course') renderCourseTab();
+  if(tab==='payment') renderPaymentTab();
+  if(tab==='venue') renderVenueTab();
+}
+
+/* ---------------- 整月加總 ---------------- */
+async function renderSummaryTab(){
+  const el=document.getElementById('tabContent');
+  el.innerHTML=`<div class="panel"><div class="loading">計算中...</div></div>`;
+  const [{data:courses,error:e1},{data:venues,error:e2},{data:exp,error:e3}]=await Promise.all([
+    sb.from('course_records').select('avg_price,source').eq('month',currentMonth),
+    sb.from('venue_rentals').select('amount').eq('month',currentMonth),
+    sb.from('monthly_expenses').select('*').eq('month',currentMonth).maybeSingle()
+  ]);
+  if(e1||e2||e3){ el.innerHTML=`<div class="panel"><div class="loading">讀取失敗</div></div>`; return; }
+  const oInInSum=(courses||[]).filter(c=>c.source==='歐印').reduce((s,c)=>s+Number(c.avg_price||0),0);
+  const yInSum=(courses||[]).filter(c=>c.source==='永衡').reduce((s,c)=>s+Number(c.avg_price||0),0);
+  const venueSum=(venues||[]).reduce((s,v)=>s+Number(v.amount||0),0);
+  const expenses=exp||{rent:0,accounting_fee:0,misc_fee:0};
+  cache.expenses=expenses;
+
+  const income=oInInSum+yInSum+venueSum;
+  const netTotal=income-Number(expenses.rent||0)-Number(expenses.accounting_fee||0)-Number(expenses.misc_fee||0);
+  const pct=(v)=> income>0 ? (v/income*100) : 0;
+  const oPct=pct(oInInSum), yPct=pct(yInSum), vPct=pct(venueSum);
+
+  el.innerHTML=`
+    <div class="panel">
+      <h3>自動加總(來自課堂紀錄・場地租借)</h3>
+      <div class="summary-grid">
+        <div class="stat amber"><div class="label">歐印銷課總金額</div><div class="value">$${fmt(oInInSum)}</div></div>
+        <div class="stat teal"><div class="label">永衡銷課金額</div><div class="value">$${fmt(yInSum)}</div></div>
+        <div class="stat"><div class="label">場地租借總金額</div><div class="value">$${fmt(venueSum)}</div></div>
+        <div class="stat"><div class="label">收入加總</div><div class="value">$${fmt(income)}</div></div>
+      </div>
+      <div class="ratio-bar">
+        <span style="width:${oPct}%;background:var(--amber)"></span>
+        <span style="width:${yPct}%;background:var(--teal)"></span>
+        <span style="width:${vPct}%;background:var(--ink-soft)"></span>
+      </div>
+      <div class="ratio-legend">
+        <span><i class="dot" style="background:var(--amber)"></i>歐印 ${oPct.toFixed(0)}%</span>
+        <span><i class="dot" style="background:var(--teal)"></i>永衡 ${yPct.toFixed(0)}%</span>
+        <span><i class="dot" style="background:var(--ink-soft)"></i>場地租借 ${vPct.toFixed(0)}%</span>
+        <span style="color:var(--ink)">比例約為 ${oPct.toFixed(0)} : ${yPct.toFixed(0)} : ${vPct.toFixed(0)}</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>手動輸入項目</h3>
+      <div class="expense-row">
+        <div><label>租金</label><input type="number" id="ex_rent" value="${expenses.rent||0}"></div>
+        <div><label>會計報帳費</label><input type="number" id="ex_acc" value="${expenses.accounting_fee||0}"></div>
+        <div><label>雜費</label><input type="number" id="ex_misc" value="${expenses.misc_fee||0}"></div>
+      </div>
+      <div class="form-actions"><button class="btn-primary" onclick="saveExpenses()">儲存本月支出</button></div>
+    </div>
+
+    <div class="panel">
+      <h3>收入支出總結</h3>
+      <div class="summary-grid">
+        <div class="stat"><div class="label">收入加總(歐印+永衡+場地租借)</div><div class="value">$${fmt(income)}</div></div>
+        <div class="stat"><div class="label">支出(租金+會計報帳費+雜費)</div><div class="value">$${fmt(Number(expenses.rent||0)+Number(expenses.accounting_fee||0)+Number(expenses.misc_fee||0))}</div></div>
+        <div class="stat teal"><div class="label">收入支出總結</div><div class="value">$${fmt(netTotal)}</div></div>
+      </div>
+    </div>`;
+}
+async function saveExpenses(){
+  const rec={
+    month:currentMonth,
+    rent:Number(document.getElementById('ex_rent').value)||0,
+    accounting_fee:Number(document.getElementById('ex_acc').value)||0,
+    misc_fee:Number(document.getElementById('ex_misc').value)||0
+  };
+  const {error}=await sb.from('monthly_expenses').upsert(rec,{onConflict:'month'});
+  if(error){ showToast('儲存失敗:'+error.message); return; }
+  showToast('已儲存本月支出'); renderSummaryTab();
+}
+
+window.addEventListener('unhandledrejection', (ev)=>{
+  console.error(ev.reason);
+  showToast('發生錯誤:'+(ev.reason && ev.reason.message ? ev.reason.message : '請重新整理再試一次'));
+});
+
+boot();
+</script>
+</body>
+</html>
