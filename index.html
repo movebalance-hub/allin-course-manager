@@ -236,11 +236,49 @@ function ratioOptionsHTML(selected){
   return ['一對一','一對二','一對三','一對四','一對五','一對六']
     .map(r=>`<option value="${r}" ${r===selected?'selected':''}>${r}</option>`).join('');
 }
-function collectNames(prefix,count){
+/* 查詢某位學員最近一次的剩餘堂數(不分月份、不分一對一或團課) */
+async function lookupLatestRemaining(name){
+  const nameTrim=(name||'').trim();
+  if(!nameTrim) return null;
+  try{
+    const {data,error}=await sb.from('course_records')
+      .select('client_name,student_entries,remaining_sessions,class_type,session_date,created_at')
+      .order('session_date',{ascending:false}).order('created_at',{ascending:false})
+      .limit(300);
+    if(error||!data) return null;
+    for(const r of data){
+      if(r.class_type==='團課' && Array.isArray(r.student_entries)){
+        const found=r.student_entries.find(e=>e && (e.name||'').trim()===nameTrim);
+        if(found && found.remaining!==undefined && found.remaining!==null) return Number(found.remaining);
+      } else if(r.class_type!=='團課' && (r.client_name||'').trim()===nameTrim){
+        if(r.remaining_sessions!==undefined && r.remaining_sessions!==null) return Number(r.remaining_sessions);
+      }
+    }
+  }catch(e){ console.warn(e); }
+  return null;
+}
+async function suggestRemaining(nameFieldId,remainFieldId){
+  const nameEl=document.getElementById(nameFieldId);
+  const remainEl=document.getElementById(remainFieldId);
+  if(!nameEl||!remainEl) return;
+  const val=await lookupLatestRemaining(nameEl.value);
+  if(val!==null){ remainEl.value=Math.max(val-1,0); }
+}
+async function suggestGroupRemaining(prefix,i){
+  const nameEl=document.getElementById(`${prefix}_name_${i}`);
+  const remainEl=document.getElementById(`${prefix}_remain_${i}`);
+  if(!nameEl||!remainEl) return;
+  const val=await lookupLatestRemaining(nameEl.value);
+  if(val!==null){ remainEl.value=Math.max(val-1,0); }
+}
+/* values: [{name, remaining}] */
+function collectStudentEntries(prefix,count){
   const arr=[];
   for(let i=0;i<count;i++){
-    const el=document.getElementById(`${prefix}_name_${i}`);
-    arr.push(el? el.value : '');
+    const nameEl=document.getElementById(`${prefix}_name_${i}`);
+    const remainEl=document.getElementById(`${prefix}_remain_${i}`);
+    const name=nameEl? nameEl.value.trim() : '';
+    if(name){ arr.push({name, remaining:remainEl? (Number(remainEl.value)||0) : 0}); }
   }
   return arr;
 }
@@ -249,7 +287,13 @@ function renderNamesArea(containerId,prefix,count,values){
   if(!container) return;
   let html='';
   for(let i=0;i<count;i++){
-    html+=`<input type="text" id="${prefix}_name_${i}" placeholder="學員姓名 ${i+1}" value="${(values[i]||'').replace(/"/g,'&quot;')}" style="margin-bottom:6px;">`;
+    const v=values[i]||{};
+    const nameVal=(v.name||'').replace(/"/g,'&quot;');
+    const remainVal=(v.remaining!==undefined && v.remaining!==null)? v.remaining : '';
+    html+=`<div style="display:flex;gap:6px;">
+      <input type="text" id="${prefix}_name_${i}" placeholder="學員姓名 ${i+1}" value="${nameVal}" style="flex:2;" onblur="suggestGroupRemaining('${prefix}',${i})">
+      <input type="number" id="${prefix}_remain_${i}" placeholder="剩餘堂數" step="0.5" value="${remainVal}" style="flex:1;">
+    </div>`;
   }
   container.innerHTML=html;
 }
@@ -258,22 +302,25 @@ function onAddClassTypeChange(){
   const ratioWrap=document.getElementById('c_ratio_wrap');
   const singleWrap=document.getElementById('c_name_single_wrap');
   const multiWrap=document.getElementById('c_name_multi_wrap');
+  const remainWrap=document.getElementById('c_remain_wrap');
   if(t==='團課'){
     ratioWrap.style.display='block'; singleWrap.style.display='none'; multiWrap.style.display='block';
+    remainWrap.style.display='none';
     addNameCount=ratioToCount(document.getElementById('c_ratio').value);
     renderNamesArea('c_names_container','c',addNameCount,[]);
   } else {
     ratioWrap.style.display='none'; singleWrap.style.display='block'; multiWrap.style.display='none';
+    remainWrap.style.display='block';
   }
 }
 function onAddRatioChange(){
   const ratio=document.getElementById('c_ratio').value;
-  const values=collectNames('c',addNameCount);
+  const values=collectStudentEntries('c',addNameCount);
   addNameCount=ratioToCount(ratio);
   renderNamesArea('c_names_container','c',addNameCount,values);
 }
 function addAddPanelNameField(){
-  const values=collectNames('c',addNameCount);
+  const values=collectStudentEntries('c',addNameCount);
   addNameCount+=1;
   renderNamesArea('c_names_container','c',addNameCount,values);
 }
@@ -282,22 +329,25 @@ function onEditClassTypeChange(){
   const ratioSel=document.getElementById('e_ratio');
   const singleWrap=document.getElementById('e_name_single_wrap');
   const multiWrap=document.getElementById('e_name_multi_wrap');
+  const remainCell=document.getElementById('e_remain_cell');
   if(t==='團課'){
     ratioSel.style.display='inline-block'; singleWrap.style.display='none'; multiWrap.style.display='block';
+    if(remainCell) remainCell.innerHTML='<span style="color:var(--ink-soft);font-size:12px;">依學員設定</span>';
     editNameCount=ratioToCount(ratioSel.value);
     renderNamesArea('e_names_container','e',editNameCount,[]);
   } else {
     ratioSel.style.display='none'; singleWrap.style.display='block'; multiWrap.style.display='none';
+    if(remainCell) remainCell.innerHTML='<input type="number" id="e_remain" step="0.5" value="0">';
   }
 }
 function onEditRatioChange(){
   const ratio=document.getElementById('e_ratio').value;
-  const values=collectNames('e',editNameCount);
+  const values=collectStudentEntries('e',editNameCount);
   editNameCount=ratioToCount(ratio);
   renderNamesArea('e_names_container','e',editNameCount,values);
 }
 function addEditPanelNameField(){
-  const values=collectNames('e',editNameCount);
+  const values=collectStudentEntries('e',editNameCount);
   editNameCount+=1;
   renderNamesArea('e_names_container','e',editNameCount,values);
 }
@@ -306,7 +356,7 @@ function editCourseRow(id){
   if(!r) return;
   editingId=id;
   editNameCount=(r.class_type==='團課')
-    ? ((r.student_names&&r.student_names.length)? r.student_names.length : ratioToCount(r.class_ratio||'一對一'))
+    ? ((r.student_entries&&r.student_entries.length)? r.student_entries.length : ratioToCount(r.class_ratio||'一對一'))
     : 1;
   renderCourseTable();
 }
@@ -329,17 +379,17 @@ async function renderCourseTab(){
           <select id="c_ratio" onchange="onAddRatioChange()">${ratioOptionsHTML('一對一')}</select>
         </div>
         <div><label>平均單價</label><input type="number" id="c_price" placeholder="0"></div>
-        <div><label>剩餘堂數</label><input type="number" id="c_remain" placeholder="0" step="0.5"></div>
+        <div id="c_remain_wrap"><label>剩餘堂數</label><input type="number" id="c_remain" placeholder="0" step="0.5"></div>
         <div><label>課源來源</label>
           <select id="c_source"><option value="永衡">永衡</option><option value="歐印">歐印</option></select>
         </div>
       </div>
       <div id="c_name_single_wrap">
         <label style="display:block;font-size:11px;color:var(--ink-soft);margin-bottom:3px;">客戶姓名</label>
-        <input type="text" id="c_name" placeholder="客戶姓名" style="width:100%;padding:8px 9px;border:1px solid var(--line);border-radius:7px;font-family:inherit;font-size:13px;">
+        <input type="text" id="c_name" placeholder="客戶姓名" onblur="suggestRemaining('c_name','c_remain')" style="width:100%;padding:8px 9px;border:1px solid var(--line);border-radius:7px;font-family:inherit;font-size:13px;">
       </div>
       <div id="c_name_multi_wrap" style="display:none;">
-        <label style="display:block;font-size:11px;color:var(--ink-soft);margin-bottom:3px;">學員姓名</label>
+        <label style="display:block;font-size:11px;color:var(--ink-soft);margin-bottom:3px;">學員姓名 / 剩餘堂數</label>
         <div id="c_names_container" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
         <button class="btn-ghost btn-sm" type="button" onclick="addAddPanelNameField()">+ 新增學員</button>
       </div>
@@ -372,7 +422,7 @@ function renderCourseTable(){
         </td>
         <td>
           <div id="e_name_single_wrap" style="${isGroup?'display:none;':''}">
-            <input type="text" id="e_name" value="${isGroup?'':(r.client_name||'')}">
+            <input type="text" id="e_name" value="${isGroup?'':(r.client_name||'')}" onblur="suggestRemaining('e_name','e_remain')">
           </div>
           <div id="e_name_multi_wrap" style="${isGroup?'':'display:none;'}">
             <div id="e_names_container" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px;"></div>
@@ -380,16 +430,20 @@ function renderCourseTable(){
           </div>
         </td>
         <td><input type="number" id="e_price" value="${r.avg_price||0}"></td>
-        <td><input type="number" id="e_remain" step="0.5" value="${r.remaining_sessions||0}"></td>
+        <td id="e_remain_cell">${isGroup? '<span style="color:var(--ink-soft);font-size:12px;">依學員設定</span>' : `<input type="number" id="e_remain" step="0.5" value="${r.remaining_sessions||0}">`}</td>
         <td><select id="e_source"><option value="永衡" ${r.source==='永衡'?'selected':''}>永衡</option><option value="歐印" ${r.source==='歐印'?'selected':''}>歐印</option></select></td>
         <td class="row-actions"><button class="btn-primary btn-sm" onclick="saveCourse('${r.id}')">儲存</button><button class="btn-ghost btn-sm" onclick="editingId=null;renderCourseTable();">取消</button></td>
       </tr>`;
     } else {
       const isGroup=r.class_type==='團課';
       const typeLabel=isGroup? ('團課・'+(r.class_ratio||'一對一')) : '一對一';
+      const entries=(isGroup && Array.isArray(r.student_entries))? r.student_entries : null;
       const nameLabel=isGroup
-        ? ((r.student_names&&r.student_names.length)? r.student_names.join('、') : (r.client_name||''))
+        ? (entries&&entries.length? entries.map(e=>e.name).join('<br>') : (r.client_name||''))
         : (r.client_name||'');
+      const remainLabel=isGroup
+        ? (entries&&entries.length? entries.map(e=>fmt(e.remaining)).join('<br>') : '')
+        : fmt(r.remaining_sessions);
       body+=`<tr>
         <td class="num">${i+1}</td>
         <td>${r.session_date||''}</td>
@@ -397,7 +451,7 @@ function renderCourseTable(){
         <td>${typeLabel}</td>
         <td>${nameLabel}</td>
         <td class="num">${fmt(r.avg_price)}</td>
-        <td class="num">${fmt(r.remaining_sessions)}</td>
+        <td class="num">${remainLabel}</td>
         <td><span class="tag ${r.source==='永衡'?'tag-y':'tag-o'}">${r.source||''}</span></td>
         <td class="row-actions"><button class="btn-ghost btn-sm" onclick="editCourseRow('${r.id}')">編輯</button><button class="btn-danger btn-sm" onclick="deleteRow('course_records','${r.id}','course')">刪除</button></td>
       </tr>`;
@@ -409,7 +463,7 @@ function renderCourseTable(){
     <tbody>${body}</tbody></table>`;
   const editing=cache.course.find(r=>r.id===editingId);
   if(editing && editing.class_type==='團課'){
-    renderNamesArea('e_names_container','e',editNameCount, editing.student_names||[]);
+    renderNamesArea('e_names_container','e',editNameCount, editing.student_entries||[]);
   }
 }
 async function addCourse(){
@@ -419,19 +473,22 @@ async function addCourse(){
     session_date:document.getElementById('c_date').value||null,
     session_time:document.getElementById('c_time').value||null,
     avg_price:Number(document.getElementById('c_price').value)||0,
-    remaining_sessions:Number(document.getElementById('c_remain').value)||0,
     source:document.getElementById('c_source').value,
     class_type:classType
   };
   if(classType==='團課'){
-    const names=collectNames('c',addNameCount).map(n=>n.trim()).filter(n=>n);
+    const entries=collectStudentEntries('c',addNameCount);
     rec.class_ratio=document.getElementById('c_ratio').value;
-    rec.student_names=names;
-    rec.client_name=names.join('、');
+    rec.student_entries=entries;
+    rec.student_names=entries.map(e=>e.name);
+    rec.client_name=entries.map(e=>e.name).join('、');
+    rec.remaining_sessions=null;
   } else {
     rec.class_ratio=null;
+    rec.student_entries=[];
     rec.student_names=[];
     rec.client_name=document.getElementById('c_name').value;
+    rec.remaining_sessions=Number(document.getElementById('c_remain').value)||0;
   }
   const {error}=await sb.from('course_records').insert(rec);
   if(error){ showToast('新增失敗:'+error.message); return; }
@@ -443,19 +500,22 @@ async function saveCourse(id){
     session_date:document.getElementById('e_date').value||null,
     session_time:document.getElementById('e_time').value||null,
     avg_price:Number(document.getElementById('e_price').value)||0,
-    remaining_sessions:Number(document.getElementById('e_remain').value)||0,
     source:document.getElementById('e_source').value,
     class_type:classType
   };
   if(classType==='團課'){
-    const names=collectNames('e',editNameCount).map(n=>n.trim()).filter(n=>n);
+    const entries=collectStudentEntries('e',editNameCount);
     rec.class_ratio=document.getElementById('e_ratio').value;
-    rec.student_names=names;
-    rec.client_name=names.join('、');
+    rec.student_entries=entries;
+    rec.student_names=entries.map(e=>e.name);
+    rec.client_name=entries.map(e=>e.name).join('、');
+    rec.remaining_sessions=null;
   } else {
     rec.class_ratio=null;
+    rec.student_entries=[];
     rec.student_names=[];
     rec.client_name=document.getElementById('e_name').value;
+    rec.remaining_sessions=Number(document.getElementById('e_remain').value)||0;
   }
   const {error}=await sb.from('course_records').update(rec).eq('id',id);
   if(error){ showToast('儲存失敗:'+error.message); return; }
