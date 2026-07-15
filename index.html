@@ -523,6 +523,12 @@ async function saveCourse(id){
 }
 
 /* ---------------- 付款紀錄 ---------------- */
+function recalcAmount(pricePrefix,sessionsPrefix,amountId){
+  const priceEl=document.getElementById(pricePrefix), sessionsEl=document.getElementById(sessionsPrefix);
+  const price=Number(priceEl&&priceEl.value)||0, sessions=Number(sessionsEl&&sessionsEl.value)||0;
+  const amountEl=document.getElementById(amountId);
+  if(amountEl) amountEl.value=(price*sessions)||'';
+}
 async function renderPaymentTab(){
   const el=document.getElementById('tabContent');
   el.innerHTML=`
@@ -531,8 +537,9 @@ async function renderPaymentTab(){
       <div class="form-grid">
         <div><label>付款會員</label><input type="text" id="p_name"></div>
         <div><label>購買方案</label><input type="text" id="p_plan"></div>
-        <div><label>平均單價</label><input type="number" id="p_price"></div>
-        <div><label>購買堂數</label><input type="number" id="p_sessions"></div>
+        <div><label>平均單價</label><input type="number" id="p_price" oninput="recalcAmount('p_price','p_sessions','p_amount')"></div>
+        <div><label>購買堂數</label><input type="number" id="p_sessions" oninput="recalcAmount('p_price','p_sessions','p_amount')"></div>
+        <div><label>收款金額</label><input type="number" id="p_amount" placeholder="0"></div>
         <div><label>結帳日期</label><input type="date" id="p_date"></div>
         <div><label>備註</label><input type="text" id="p_note"></div>
       </div>
@@ -547,14 +554,15 @@ async function renderPaymentTab(){
 function renderPaymentTable(){
   const rows=cache.payment;
   let body='';
-  if(rows.length===0){ body='<tr class="empty-row"><td colspan="7">本月尚無付款紀錄</td></tr>'; }
+  if(rows.length===0){ body='<tr class="empty-row"><td colspan="8">本月尚無付款紀錄</td></tr>'; }
   rows.forEach(r=>{
     if(editingId===r.id){
       body+=`<tr>
         <td><input type="text" id="e_name" value="${r.member_name||''}"></td>
         <td><input type="text" id="e_plan" value="${r.plan||''}"></td>
-        <td><input type="number" id="e_price" value="${r.avg_price||0}"></td>
-        <td><input type="number" id="e_sessions" value="${r.sessions_purchased||0}"></td>
+        <td><input type="number" id="e_price" value="${r.avg_price||0}" oninput="recalcAmount('e_price','e_sessions','e_amount')"></td>
+        <td><input type="number" id="e_sessions" value="${r.sessions_purchased||0}" oninput="recalcAmount('e_price','e_sessions','e_amount')"></td>
+        <td><input type="number" id="e_amount" value="${r.amount_received||0}"></td>
         <td><input type="date" id="e_date" value="${r.payment_date||''}"></td>
         <td><input type="text" id="e_note" value="${r.note||''}"></td>
         <td class="row-actions"><button class="btn-primary btn-sm" onclick="savePayment('${r.id}')">儲存</button><button class="btn-ghost btn-sm" onclick="editingId=null;renderPaymentTable();">取消</button></td>
@@ -565,6 +573,7 @@ function renderPaymentTable(){
         <td>${r.plan||''}</td>
         <td class="num">${fmt(r.avg_price)}</td>
         <td class="num">${fmt(r.sessions_purchased)}</td>
+        <td class="num">${fmt(r.amount_received)}</td>
         <td>${r.payment_date||''}</td>
         <td>${r.note||''}</td>
         <td class="row-actions"><button class="btn-ghost btn-sm" onclick="editingId='${r.id}';renderPaymentTable();">編輯</button><button class="btn-danger btn-sm" onclick="deleteRow('payment_records','${r.id}','payment')">刪除</button></td>
@@ -573,7 +582,7 @@ function renderPaymentTable(){
   });
   document.querySelector('.panel:last-child').innerHTML=`
     <h3>本月付款紀錄</h3>
-    <table><thead><tr><th>付款會員</th><th>購買方案</th><th>平均單價</th><th>購買堂數</th><th>結帳日期</th><th>備註</th><th></th></tr></thead>
+    <table><thead><tr><th>付款會員</th><th>購買方案</th><th>平均單價</th><th>購買堂數</th><th>收款金額</th><th>結帳日期</th><th>備註</th><th></th></tr></thead>
     <tbody>${body}</tbody></table>`;
 }
 async function addPayment(){
@@ -583,6 +592,7 @@ async function addPayment(){
     plan:document.getElementById('p_plan').value,
     avg_price:Number(document.getElementById('p_price').value)||0,
     sessions_purchased:Number(document.getElementById('p_sessions').value)||0,
+    amount_received:Number(document.getElementById('p_amount').value)||0,
     payment_date:document.getElementById('p_date').value||null,
     note:document.getElementById('p_note').value
   };
@@ -596,6 +606,7 @@ async function savePayment(id){
     plan:document.getElementById('e_plan').value,
     avg_price:Number(document.getElementById('e_price').value)||0,
     sessions_purchased:Number(document.getElementById('e_sessions').value)||0,
+    amount_received:Number(document.getElementById('e_amount').value)||0,
     payment_date:document.getElementById('e_date').value||null,
     note:document.getElementById('e_note').value
   };
